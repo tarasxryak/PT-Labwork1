@@ -18,11 +18,9 @@ class Card:
     cost: int = 0
     investigates: bool = False
     spell_or_item: bool = False   # подходит для «Для следующего фокуса…»
-    item: bool = False            # подходит для «Манипуляции»
 
 
 FMNT = "Для следующего фокуса…"
-PRESTIDIGITATION = "Манипуляция"
 NECRONOMICON = "Некрономикон"
 PARANOIA = "Паранойя"
 
@@ -33,21 +31,21 @@ def build_deck():
     def add(card, copies=1):
         deck.extend([card] * copies)
 
-    add(Card("Ментальное видение", "asset", 4, True, True, False))
-    add(Card("Воровские инструменты", "asset", 3, True, True, True))
-    add(Card("Динамо-фонарь", "asset", 1, True, True, True), 2)
+    add(Card("Ментальное видение", "asset", 4, True, True))
+    add(Card("Воровские инструменты", "asset", 3, True, True))
+    add(Card("Динамо-фонарь", "asset", 1, True, True), 2)
 
-    add(Card("Резонансный покров", "asset", 3, False, True, True))
-    add(Card("Космическое пламя", "asset", 3, False, True, False))
+    add(Card("Резонансный покров", "asset", 3, False, True))
+    add(Card("Космическое пламя", "asset", 3, False, True))
     add(Card("Джим Кальвер", "asset", 4))
-    add(Card("Счастливый оберег", "asset", 2, False, True, True))
+    add(Card("Счастливый оберег", "asset", 2, False, True))
     add(Card("Спиритическая интуиция", "asset", 2))
-    add(Card("Счастливый портсигар", "asset", 2, False, True, True))
-    add(Card("Бескурковый M1903", "asset", 3, False, True, True))
+    add(Card("Счастливый портсигар", "asset", 2, False, True))
+    add(Card("Бескурковый M1903", "asset", 3, False, True))
     add(Card("Оливье Бишоп", "asset", 4))
     add(Card("Подвешенный язык", "asset", 2))
     add(Card("Загребущие ручонки", "asset", 1))
-    add(Card("Розочка", "asset", 1, False, True, True), 2)
+    add(Card("Розочка", "asset", 1, False, True), 2)
 
     add(Card(FMNT, "event", 0))
     add(Card("Предостережение", "event", 0))
@@ -55,7 +53,7 @@ def build_deck():
     add(Card("Воля космоса", "event", 0))
     add(Card("Проникновение со взломом", "event", 2))
     add(Card("Красный день календаря", "event", 0))
-    add(Card(PRESTIDIGITATION, "event", 1))
+    add(Card("Манипуляция", "event", 1))
     add(Card("Неприкосновенный запас", "event", 0), 2)
 
     add(Card("Духовная связь", "skill"))
@@ -119,23 +117,7 @@ def can_play_investigator_asset(hand, deck, resources, necronomicon):
     return False
 
 
-def prestidigitation_combo(card, hand, resources, necronomicon):
-    # редкая комбинация, которой нет в аналитической модели:
-    # «Манипуляция» играет вещь без действия, свойство Декстера играет вторую вещь,
-    # и в конце хода на руку возвращается вторая, а исследовательская остаётся
-    if necronomicon or not (card.investigates and card.item):
-        return False
-    if not any(c.name == PRESTIDIGITATION for c in hand):
-        return False
-    rest = hand[:]
-    rest.remove(card)
-    others = [c.cost for c in rest if c.kind == "asset" and c.item]
-    if not others:
-        return False
-    return resources >= 1 + max(card.cost - 2, 0) + min(others)
-
-
-def first_turn(hand, deck, use_prestidigitation):
+def first_turn(hand, deck):
     resources, actions, necronomicon = 5, 3, False
     hand = hand[:]
 
@@ -143,7 +125,7 @@ def first_turn(hand, deck, use_prestidigitation):
         if can_play_investigator_asset(hand, deck, resources, necronomicon):
             return True
         # карта, взятая последним действием, уже не успеет сыграть
-        if actions == 1 and not use_prestidigitation:
+        if actions == 1:
             return False
         card = deck.pop()
         actions -= 1
@@ -153,17 +135,13 @@ def first_turn(hand, deck, use_prestidigitation):
             resources = 0             # сбросить все ресурсы
         else:
             hand.append(card)
-            if actions == 0:
-                return (use_prestidigitation and
-                        prestidigitation_combo(card, hand, resources,
-                                               necronomicon))
     return False
 
 
-def simulate(n_trials, seed, use_prestidigitation):
+def simulate(n_trials, seed):
     rng = random.Random(seed)
     template = build_deck()
-    successes = sum(first_turn(*setup(rng, template), use_prestidigitation)
+    successes = sum(first_turn(*setup(rng, template))
                     for _ in range(n_trials))
     return successes / n_trials
 
@@ -215,10 +193,8 @@ def main():
     print(f"  P(A), если менять все 5 карт      ≈ {float(p_hard):.6f}")
 
     print(f"\nМонте-Карло, {n_trials} испытаний, seed = {seed}")
-    for flag, label in ((False, "модель отчёта"),
-                        (True, "с комбинацией «Манипуляции»")):
-        p_hat = simulate(n_trials, seed, flag)
-        print(f"  {label:30s}: {p_hat:.6f}")
+    p_hat = simulate(n_trials, seed)
+    print(f"  P(A) ≈ {p_hat:.6f}")
 
 
 if __name__ == "__main__":
